@@ -1,0 +1,25 @@
+{
+  "methodA": [
+    {
+      "id": 1,
+      "value": "data for methodA"
+    }
+  ],
+  "methodB": [
+    {
+      "id": 1,
+      "value": "data for methodB"
+    }
+  ],
+  "methodC": [
+    {
+      "id": 1,
+      "value": "data for methodC"
+    }
+  ],
+  "methodF": {
+    "subMethod": {
+      "x": 1
+    }
+  }
+}
