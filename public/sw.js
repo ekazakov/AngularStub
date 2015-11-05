@@ -1,70 +1,55 @@
-var log = console.log.bind(console);
-log('SW ready');
-var apiCall = /\/api\//i;
+const mocks = [];
 
-var context = this;
+function responseFactory(event, mock) {
+    const url = event.request.url;
+    const method = event.request.method;
 
-function requestsMock(base, config) {
-    context.addEventListener('fetch', (event) => {
-        var url = event.request.url;
-        var method = event.request.method;
+    const handler = (body) => {
+        const response = getResponse(mock, url, method, body);
+        return new Response(stringify(response.data), response);
+    }
 
-        if (!base.test(url)) {
-            return;
-        }
+    if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
+        return event.request.json()
+            .then(handler)
+            .catch(error => console.error(error));
+    }
 
-        console.log(event.request);
-
-        var stub = config.find((stub) => isRequestMatches(url, method, stub));
-
-        if (stub != null) {
-            console.warn(`Request ${url} stubbed`);
-            if (method === 'POST' && typeof stub.response === 'function') {
-                event.respondWith(
-                    event.request.json()
-                        .then((body) => {
-                            var response = stub.response(url, method, body);
-                            return new Response(getData(response.data), response);
-                        })
-                );
-            } else {
-                event.respondWith(
-                    new Response(getData(stub.response.data), stub.response)
-                );
-            }
-
-        }
-    });
+    return Promise.resolve(null).then(handler);
 }
 
-function getData(data) {
+function getResponse(mock, url, method, body) {
+    if (typeof mock.response === 'function') {
+        return mock.response(url, method, body);
+    }
+
+    return mock.response;
+}
+
+function stringify(data) {
     return typeof data === 'string' ? data : JSON.stringify(data);
 }
 
-function isRequestMatches(requestUrl, requestMethod, stub) {
-    if (stub.url instanceof RegExp) {
-        return stub.url.test(requestUrl);
-    }
-
-    return requestUrl.search(stub.url) !== -1;
+function isRequestMatches(requestUrl, requestMethod, mock) {
+    const regexp = mock.url instanceof RegExp ? mock.url : new RegExp(mock.url);
+    return regexp.test(requestUrl);
 }
 
-requestsMock(apiCall, [
-    {
-        url: '/api/A',
-        response: {
-            data: 'fake response A',
-            status: 201,
-            statusText: 'Stabbed response A'
-        }
-    },
-    {
-        url: '/api/B',
-        response: () => ({
-            data: 'fake response B',
-            status: 201,
-            statusText: 'Stabbed response B'
-        })
+function addMock(mock) {
+    mocks.push(mock);
+}
+
+self.addEventListener('fetch', (event) => {
+    const url = event.request.url;
+    const method = event.request.method;
+    const mock = mocks.find((mock) => isRequestMatches(url, method, mock));
+
+    if (mock == null) {
+        return;
     }
 
-]);
+    console.warn(`Request to ${url} is mocked`);
+    event.respondWith(responseFactory(event, mock));
+});
+
+self.importScripts('mocks.js');
